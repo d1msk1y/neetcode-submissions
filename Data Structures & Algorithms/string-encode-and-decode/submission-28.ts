@@ -1,0 +1,32 @@
+class Solution {
+    /**
+     * @param {string[]} strs
+     * @returns {string}
+     */
+    encode(strs: string[]): string {
+        for(let i = 0; i < strs.length; i++){
+            strs[i] = strs[i].length + "#" + strs[i]
+        }
+        return strs.join("");
+    }
+
+    /**
+     * @param {string} str
+     * @returns {string[]}
+     */
+    decode(str: string): string[] {
+        let result: string[]= [];
+        let workStr = str;
+        for(let i = 0; i < str.length;){
+            let length = workStr.split("#")[0]
+            let stringEndPos = length.length + Number(length)+1
+            let decodedString = workStr.slice(length.length + 1, stringEndPos)
+            workStr = workStr.slice(stringEndPos, workStr.length)
+            result.push(decodedString)
+            if(workStr.length <= 0){
+                break;
+            }
+        }
+        return result;
+    }
+}
