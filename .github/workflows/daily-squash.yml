@@ -1,0 +1,57 @@
+name: Daily commit squash
+
+# Squashes every commit made on a single calendar day (Europe/Zurich) into one
+# commit, so the repo ends up with at most one commit per day. Runs once a
+# day; each run targets the most recently *completed* calendar day so it
+# never touches commits that are still "in progress" for today.
+
+on:
+  schedule:
+    # 3:00 Europe/Zurich. Zurich is UTC+2 in summer (CEST) and UTC+1 in
+    # winter (CET); GitHub Actions cron is UTC-only and does not shift for
+    # DST, so two schedules are used to keep the run at ~3am local
+    # year-round. Both will trigger; the script is idempotent, so the run
+    # for the "wrong" offset simply finds nothing to squash.
+    - cron: '0 1 * 3-10 *'    # 3am CEST (UTC+2), roughly Mar-Oct
+    - cron: '0 2 * 11,12,1,2 *'  # 3am CET (UTC+1), roughly Nov-Feb
+  workflow_dispatch:
+    inputs:
+      date:
+        description: 'Day to squash (YYYY-MM-DD), defaults to yesterday (Europe/Zurich)'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  squash:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Squash target day's commits
+        id: squash
+        run: |
+          before="$(git rev-parse HEAD)"
+          chmod +x scripts/squash-daily-commits.sh
+          ./scripts/squash-daily-commits.sh "${{ inputs.date }}" main
+          after="$(git rev-parse HEAD)"
+          if [[ "$before" != "$after" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push squashed history
+        if: steps.squash.outputs.changed == 'true'
+        run: git push --force-with-lease origin HEAD:main
